@@ -8,12 +8,15 @@ import { getAssets } from "../utils/cardano";
 import NftGrid from "../components/NftGrid";
 import initLucid from "../utils/lucid";
 import {
-  Lucid,
-  TxHash,
-  Lovelace,
   Constr,
-  SpendingValidator,
   Data,
+  Lovelace,
+  Lucid,
+  PolicyId,
+  SpendingValidator,
+  TxHash,
+  Unit,
+  utf8ToHex,
 } from "lucid-cardano";
 import * as helios from "@hyperionbt/helios";
 
@@ -42,9 +45,28 @@ const Helios: NextPage = () => {
   const Datum = (number: number) => Data.to(BigInt(number));
   const Redeemer = (number: number) => Data.to(BigInt(number));
 
+  const mintNft = async () => {
+    if (lucid) {
+      const policyId: PolicyId =
+        lucid.utils.mintingPolicyToId(matchingNumberScript);
+      const tokenName = utf8ToHex(`Ariady Putra - ${Date()}`);
+      const assetToMint: Unit = policyId + tokenName;
+
+      const tx = await lucid
+        .newTx()
+        .mintAssets({ [assetToMint]: BigInt(1) })
+        .attachMintingPolicy(matchingNumberScript)
+        .complete();
+
+      const signedTx = await tx.sign().complete();
+      const txHash = await signedTx.submit();
+      return txHash;
+    }
+  };
+
   const lockUtxo = async () => {
     if (lucid) {
-      const matchingNumberAddress: any =
+      const matchingNumberAddress =
         lucid.utils.validatorToAddress(matchingNumberScript);
 
       const tx = await lucid
@@ -64,7 +86,7 @@ const Helios: NextPage = () => {
 
   const redeemUtxo = async () => {
     if (lucid) {
-      const matchingNumberAddress: any =
+      const matchingNumberAddress =
         lucid.utils.validatorToAddress(matchingNumberScript);
 
       const utxo = (await lucid.utxosAt(matchingNumberAddress)).slice(-1)[0];
@@ -97,8 +119,13 @@ const Helios: NextPage = () => {
       {/* connected Wallet Address */}
       <div>Address: {walletStore.address}</div>
 
-      {/* Deposit button */}
       <div className="mx-40 my-10">
+        {/* Mint NFT button */}
+        <button className="btn m-5" onClick={() => mintNft()}>
+          Mint NFT
+        </button>
+
+        {/* Deposit button */}
         <button className="btn btn-primary m-5" onClick={() => lockUtxo()}>
           Deposit
         </button>
