@@ -37,9 +37,14 @@ const Helios: NextPage = () => {
     }
   }, [lucid]);
 
+  const vestingPolicy: SpendingValidator = {
+    type: "PlutusV1",
+    script: "5907945907910100003233223232323232323232323232323322323232323222232325335332232333573466e1c005",
+  };
+
   const mintingPolicy: MintingPolicy = {
     type: "PlutusV2",
-    script: "TODO",
+    script: "5907945907910100003233223232323232323232323232323322323232323222232325335332232333573466e1c005",
   };
 
   const alwaysSucceedScript: SpendingValidator = {
@@ -68,6 +73,37 @@ const Helios: NextPage = () => {
     }
   };
 
+  const vestUtxo = async () => {
+    if (lucid) {
+      const receiving_addr: string =
+        "addr_test1qryc5tck5kqqs3arcqnl4lplvw5yg2ujsdnhx5eawn9lyzzvpmpraw365fayhrtpzpl4nulq6f9hhdkh4cdyh0tgnjxsg03qnh";
+
+      const tx = await lucid
+        .newTx()
+        // TODO: .payToContract()
+        .complete();
+
+      const signedTx = await tx.sign().complete();
+      const txHash = await signedTx.submit();
+      return txHash;
+    }
+  };
+
+  const redeemVestedUtxo = async () => {
+    if (lucid) {
+      // TODO
+
+      const tx = await lucid
+        .newTx()
+        // TODO
+        .complete();
+
+      const signedTx = await tx.sign().complete();
+      const txHash = await signedTx.submit();
+      return txHash;
+    }
+  };
+
   const lockUtxo = async () => {
     if (lucid) {
       const alwaysSucceedAddress =
@@ -88,17 +124,17 @@ const Helios: NextPage = () => {
         .payToContract(
           alwaysSucceedAddress,
           { inline: Datum() },
-          { lovelace: BigInt(100_000_000) }
+          { lovelace: BigInt(100_000000) }
         )
         .payToContract(
           alwaysSucceedAddress,
           { inline: Datum() },
-          { lovelace: BigInt(200_000_000) }
+          { lovelace: BigInt(200_000000) }
         )
         .payToContract(
           alwaysSucceedAddress,
           { inline: Datum() },
-          { lovelace: BigInt(300_000_000) }
+          { lovelace: BigInt(300_000000) }
         )
         .payToContract(
           alwaysSucceedAddress,

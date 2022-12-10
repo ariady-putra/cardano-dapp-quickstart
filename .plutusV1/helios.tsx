@@ -72,7 +72,7 @@ const Helios: NextPage = () => {
       const tx = await lucid
         .newTx()
         .payToContract(matchingNumberAddress, Datum(18349276), {
-          lovelace: BigInt(700_000_000),
+          lovelace: BigInt(700_000000),
         })
         .complete();
 
