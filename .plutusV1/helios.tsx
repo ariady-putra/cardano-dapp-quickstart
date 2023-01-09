@@ -49,7 +49,7 @@ const Helios: NextPage = () => {
     if (lucid) {
       const policyId: PolicyId =
         lucid.utils.mintingPolicyToId(matchingNumberScript);
-      const tokenName = utf8ToHex(`Ariady Putra - ${Date()}`);
+      const tokenName = utf8ToHex('AriadyPutra');
       const assetToMint: Unit = policyId + tokenName;
 
       const tx = await lucid
