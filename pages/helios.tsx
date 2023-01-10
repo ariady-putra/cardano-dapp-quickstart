@@ -28,6 +28,7 @@ const Helios: NextPage = () => {
   const [lucid, setLucid] = useState<Lucid>();
   const [script, setScript] = useState<SpendingValidator>();
   const [scriptAddress, setScriptAddress] = useState("");
+  const [refTxHash, setRefTxHash] = useState("");
 
   useEffect(() => {
     if (lucid) {
@@ -92,29 +93,82 @@ const Helios: NextPage = () => {
     }
   };
 
-  const vestUtxo = async () => {
+  const sendReferenceInputTxn = async () => {
     if (lucid) {
-      const receiving_addr: string =
-        "addr_test1qryc5tck5kqqs3arcqnl4lplvw5yg2ujsdnhx5eawn9lyzzvpmpraw365fayhrtpzpl4nulq6f9hhdkh4cdyh0tgnjxsg03qnh";
+      const scriptAddress = lucid.utils.validatorToAddress(alwaysSucceedScript);
+
+      /* example datum:
+      data Game = Game
+        { gFirst          :: !PaymentPubKeyHash
+        , gSecond         :: !PaymentPubKeyHash
+        , gStake          :: !Integer
+        , gPlayDeadline   :: !POSIXTime
+        , gRevealDeadline :: !POSIXTime
+        , gToken          :: !AssetClass
+        }
+      */
+      const gFirst = new Constr(0, ["deadbeef"]);
+      const gSecond = new Constr(0, [utf8ToHex("2ndPKH")]);
+      const gStake = BigInt(5_000000);
+      const gPlayDeadline = BigInt(new Date("2/1/2023").getTime());
+      const gRevealDeadline = BigInt(new Date("2/8/2023").getTime());
+      const gToken = utf8ToHex("asset_class");
+      const ariadyDatum = new Constr(0, [
+        gFirst,
+        gSecond,
+        gStake,
+        gPlayDeadline,
+        gRevealDeadline,
+        gToken,
+      ]);
 
       const tx = await lucid
         .newTx()
-        // TODO: .payToContract()
+        .payToContract(
+          scriptAddress, // address
+          {
+            inline: Data.to(ariadyDatum), // outputData
+          },
+          {
+            lovelace: BigInt(5_000000), // assets
+          }
+        )
         .complete();
 
       const signedTx = await tx.sign().complete();
       const txHash = await signedTx.submit();
+      setRefTxHash(txHash); // save txHash to refTxHash using setState()
       return txHash;
     }
   };
 
-  const redeemVestedUtxo = async () => {
+  const readReferenceInputTxn = async () => {
     if (lucid) {
-      // TODO
+      // user pkh
+      const wallet = await lucid.wallet.address();
+      const { paymentCredential } = lucid.utils.getAddressDetails(wallet);
+
+      // to be collected
+      const vestingAddress = lucid.utils.validatorToAddress(vestingPolicy);
+      const collectUtxos = await lucid.utxosAt(vestingAddress);
+      if (!collectUtxos) throw "No UTxO to collect from!";
+
+      // to be read from
+      const scriptAddress = lucid.utils.validatorToAddress(alwaysSucceedScript);
+      const utxos = await lucid.utxosAt(scriptAddress);
+      if (!utxos) throw "No UTxO to read from!";
+
+      // refTxHash: see setState() above
+      const txIn = utxos.find((utxo) => utxo.txHash == refTxHash);
+      if (!txIn) throw "No valid hash from read script address!";
+      console.log(txIn.datum);
 
       const tx = await lucid
         .newTx()
-        // TODO
+        .collectFrom([collectUtxos[0]]) // no redeemer
+        .readFrom([txIn])
+        .addSignerKey(paymentCredential?.hash!)
+        .validFrom(Date.now())
         .complete();
 
       const signedTx = await tx.sign().complete();
@@ -177,28 +231,25 @@ const Helios: NextPage = () => {
         lucid.utils.validatorToAddress(alwaysSucceedScript);
 
       /* Modified the unlock to include all the alwaysSucceedAddress utxos: */
-      const referenceScriptUtxo = (await lucid.utxosAt(alwaysSucceedAddress))
+      const referenceScriptUtxos = (await lucid.utxosAt(alwaysSucceedAddress))
 
         /* .find((utxo) => Boolean(utxo.scriptRef)); */
         .filter((utxo) => Boolean(utxo.scriptRef));
 
-      if (!referenceScriptUtxo) throw new Error("Reference script not found");
+      if (!referenceScriptUtxos) throw new Error("Reference script not found");
 
-      /* const utxo = (await lucid.utxosAt(alwaysSucceedAddress)).find( */
-      const utxo = (await lucid.utxosAt(alwaysSucceedAddress)).filter(
+      /* const utxos = (await lucid.utxosAt(alwaysSucceedAddress)).find( */
+      const utxos = (await lucid.utxosAt(alwaysSucceedAddress)).filter(
         (utxo) => utxo.datum === Datum() && !utxo.scriptRef
       );
-      if (!utxo) throw new Error("Spending script utxo not found");
+      if (!utxos) throw new Error("Spending script utxo not found");
 
       const tx = await lucid
         .newTx()
 
-        /* .readFrom([referenceScriptUtxo]) */
-        // spending utxo by reading plutusV2 from reference utxo
-        .readFrom(referenceScriptUtxo)
-
-        /* .collectFrom([utxo], Redeemer()) */
-        .collectFrom(utxo, Redeemer())
+        // spend utxo by reading plutusV2 from reference utxo
+        .collectFrom(utxos, Redeemer())
+        .readFrom(referenceScriptUtxos)
 
         .complete();
 
