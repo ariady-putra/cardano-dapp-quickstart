@@ -177,6 +177,84 @@ const Helios: NextPage = () => {
     }
   };
 
+  const helloAikenScript: SpendingValidator = {
+    type: "PlutusV2",
+    script:
+      "587f587d0100003232323232323232222533300732323232533300b3370e90000008a5014a260166ea80054ccc024cdc38008010a60103d87a800014c103d8798000375a0066eb400c5261633001001480008888cccc018cdc38008018049199980280299b8000448008c02c0040080088c010dd5000ab9a5573aaae795d0aba21",
+  };
+  const lockAiken = async () => {
+    console.log("lockAiken");
+    if (lucid) {
+      const helloAikenAddress =
+        lucid.utils.validatorToAddress(helloAikenScript);
+      console.log({ scriptAddress: helloAikenAddress });
+
+      const lock = Data.to(BigInt(42)); // datum
+      console.log({ datum: lock });
+
+      const tx = await lucid
+        .newTx()
+        .payToContract(
+          helloAikenAddress,
+          { inline: lock },
+          { lovelace: BigInt(42_000000) }
+        )
+        .payToContract(
+          helloAikenAddress,
+          {
+            asHash: lock,
+            scriptRef: helloAikenScript,
+          },
+          {}
+        )
+        .complete();
+
+      const signedTx = await tx.sign().complete();
+      const txHash = await signedTx.submit();
+      console.log({ txHash: txHash });
+
+      return txHash;
+    }
+  };
+  const redeemAiken = async () => {
+    console.log("redeemAiken");
+    if (lucid) {
+      const userAddress = await lucid.wallet.address();
+      console.log({ userAddress: userAddress });
+
+      const helloAikenAddress =
+        lucid.utils.validatorToAddress(helloAikenScript);
+      console.log({ scriptAddress: helloAikenAddress });
+
+      const lock = Data.to(BigInt(42)); // datum
+      console.log({ datum: lock });
+
+      const utxos = (await lucid.utxosAt(helloAikenAddress)).filter((utxo) => {
+        console.log({ utxo: utxo });
+        return utxo.datum === lock && !utxo.scriptRef;
+      });
+
+      if (!utxos) throw new Error("Spending script utxo not found");
+      console.log({ utxos: utxos });
+
+      const key = Data.to(BigInt(42)); // redeemer
+      console.log({ redeemer: key });
+
+      const tx = await lucid
+        .newTx()
+        .collectFrom(utxos, key)
+        .addSigner(userAddress)
+        .attachSpendingValidator(helloAikenScript)
+        .complete();
+
+      const signedTx = await tx.sign().complete();
+      const txHash = await signedTx.submit();
+      console.log({ txHash: txHash });
+
+      return txHash;
+    }
+  };
+
   const lockUtxo = async () => {
     if (lucid) {
       const alwaysSucceedAddress =
@@ -289,6 +367,16 @@ const Helios: NextPage = () => {
         {/* Unlock button */}
         <button className="btn btn-secondary m-5" onClick={() => redeemUtxo()}>
           Unlock
+        </button>
+
+        {/* Lock button */}
+        <button className="btn btn-primary m-5" onClick={() => lockAiken()}>
+          Lock 42 to Aiken
+        </button>
+
+        {/* Unlock button */}
+        <button className="btn btn-secondary m-5" onClick={() => redeemAiken()}>
+          Unlock 42 from Aiken
         </button>
       </div>
     </div>
