@@ -10,8 +10,9 @@ const initLucid = async (wallet: string) => {
     ),
     "Preview"
   );
+
   lucid.selectWallet(api);
-  //setLucid(lucid);
+
   return lucid;
 };
 
