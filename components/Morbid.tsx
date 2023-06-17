@@ -1,7 +1,9 @@
 import { Constr, Data, Lucid, SpendingValidator, UTxO } from "lucid-cardano";
 import { useEffect, useState } from "react";
+import { StoreProvider } from "easy-peasy";
 import { getDatumFields } from "../utils/blockfrost";
 import { hashDatum } from "../utils/cardano";
+import chestStore, { useStoreActions, useStoreState } from "../utils/chest";
 
 const Morbid = (props: {
   lucid: Lucid;
@@ -10,7 +12,8 @@ const Morbid = (props: {
   const lucid = props.lucid;
   const setActionResult = props.setActionResult;
 
-  const [chest, setChest] = useState("");
+  const chest = useStoreState((state) => state.chest);
+  const setChest = useStoreActions((actions) => actions.setChest);
 
   const [loaded, setLoaded] = useState(false);
 
@@ -56,7 +59,48 @@ const Morbid = (props: {
         console.log({ txHash: txHash });
 
         setActionResult(`TxHash: ${txHash}`);
-        setChest(txHash);
+        setChest({ txHash: txHash });
+        return txHash;
+      }
+      throw { error: "Invalid Lucid State!" };
+    } catch (x) {
+      setActionResult(JSON.stringify(x));
+    }
+  };
+
+  const addTreasure = async () => {
+    try {
+      console.log(`AddTreasure(${chest.txHash}):`);
+      if (lucid && chest.txHash.length) {
+        const userAddress = await lucid.wallet.address();
+        console.log({ userAddress: userAddress });
+
+        const morbidAddress = lucid.utils.validatorToAddress(morbidScript);
+        console.log({ scriptAddress: morbidAddress });
+
+        const deadline = new Date().getTime();
+        const creator =
+          lucid.utils.getAddressDetails(userAddress).paymentCredential?.hash;
+        const datum = Data.to(
+          new Constr(0, [BigInt(deadline), String(creator)])
+        );
+        console.log({ datum: datum });
+
+        const tx = await lucid
+          .newTx()
+          .payToContract(
+            morbidAddress,
+            { inline: datum, scriptRef: morbidScript },
+            { lovelace: BigInt(42_000000) }
+          )
+          .complete();
+
+        const signedTx = await tx.sign().complete();
+        const txHash = await signedTx.submit();
+        console.log({ txHash: txHash });
+
+        setActionResult(`TxHash: ${txHash}`);
+        setChest({ txHash: txHash });
         return txHash;
       }
       throw { error: "Invalid Lucid State!" };
@@ -67,8 +111,8 @@ const Morbid = (props: {
 
   const unlockChest = async () => {
     try {
-      console.log(`UnlockChest(${chest}):`);
-      if (lucid && chest.length) {
+      console.log(`UnlockChest(${chest.txHash}):`);
+      if (lucid && chest.txHash.length) {
         const morbidAddress = lucid.utils.validatorToAddress(morbidScript);
         console.log({ scriptAddress: morbidAddress });
 
@@ -97,7 +141,7 @@ const Morbid = (props: {
 
           switch (datumFields.length) {
             case 2: // CreateChest
-              if (utxo.txHash === chest) {
+              if (utxo.txHash === chest.txHash) {
                 const deadline = datumFields[0];
                 const deadlineValue = deadline["int"];
                 if (deadlineValue < new Date().getTime()) {
@@ -110,7 +154,7 @@ const Morbid = (props: {
             case 1: // AddTreasure
               const refTxn = datumFields[0];
               const refTxnValue = refTxn["bytes"];
-              if (refTxnValue === chest) {
+              if (refTxnValue === chest.txHash) {
                 chestUTxOs.push(utxo);
               }
               return;
@@ -146,7 +190,7 @@ const Morbid = (props: {
         console.log({ txHash: txHash });
 
         setActionResult(`TxHash: ${txHash}`);
-        setChest("");
+        setChest({ txHash: "" });
         return txHash;
       }
       throw { error: "Invalid Lucid State!" };
@@ -164,7 +208,7 @@ const Morbid = (props: {
         Create Chest
       </button>
 
-      {chest.length ? (
+      {chest.txHash.length ? (
         <>
           {/* UnlockChest */}
           <button className="btn btn-secondary m-5" onClick={unlockChest}>
@@ -172,7 +216,7 @@ const Morbid = (props: {
           </button>
 
           {/* ChestInfo */}
-          <div>{`Chest: ${chest}`}</div>
+          <div>{`Chest: ${chest.txHash}`}</div>
         </>
       ) : (
         <div>
