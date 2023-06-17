@@ -12,6 +12,7 @@ import initLucid from "../utils/lucid";
 import WalletConnect from "../components/WalletConnect";
 import LockUnlock from "../components/LockUnlock";
 import VestingScript from "../components/VestingScript";
+import Morbid from "../components/Morbid";
 
 const Helios: NextPage = () => {
   const walletStore = useStoreState((state: any) => state.wallet);
@@ -57,6 +58,8 @@ const Helios: NextPage = () => {
       <LockUnlock lucid={lucid} setActionResult={setActionResult} />
 
       <VestingScript lucid={lucid} setActionResult={setActionResult} />
+
+      <Morbid lucid={lucid} setActionResult={setActionResult} />
 
       <div className="px-10 text-xl">
         <pre>{actionResult}</pre>
