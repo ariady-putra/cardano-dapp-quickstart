@@ -40,16 +40,16 @@ const Morbid = (props: {
         const deadline = new Date().getTime();
         const creator =
           lucid.utils.getAddressDetails(userAddress).paymentCredential?.hash;
-        const datum = Data.to(
+        const createChest = Data.to(
           new Constr(0, [BigInt(deadline), String(creator)])
         );
-        console.log({ datum: datum });
+        console.log({ datum: createChest });
 
         const tx = await lucid
           .newTx()
           .payToContract(
             morbidAddress,
-            { inline: datum, scriptRef: morbidScript },
+            { inline: createChest, scriptRef: morbidScript },
             { lovelace: BigInt(42_000000) }
           )
           .complete();
@@ -78,19 +78,15 @@ const Morbid = (props: {
         const morbidAddress = lucid.utils.validatorToAddress(morbidScript);
         console.log({ scriptAddress: morbidAddress });
 
-        const deadline = new Date().getTime();
-        const creator =
-          lucid.utils.getAddressDetails(userAddress).paymentCredential?.hash;
-        const datum = Data.to(
-          new Constr(0, [BigInt(deadline), String(creator)])
-        );
-        console.log({ datum: datum });
+        const refTxn = chest.txHash;
+        const addTreasure = Data.to(new Constr(1, [String(refTxn)]));
+        console.log({ datum: addTreasure });
 
         const tx = await lucid
           .newTx()
           .payToContract(
             morbidAddress,
-            { inline: datum, scriptRef: morbidScript },
+            { inline: addTreasure },
             { lovelace: BigInt(42_000000) }
           )
           .complete();
@@ -100,7 +96,6 @@ const Morbid = (props: {
         console.log({ txHash: txHash });
 
         setActionResult(`TxHash: ${txHash}`);
-        setChest({ txHash: txHash });
         return txHash;
       }
       throw { error: "Invalid Lucid State!" };
@@ -210,6 +205,11 @@ const Morbid = (props: {
 
       {chest.txHash.length ? (
         <>
+          {/* AddTreasure */}
+          <button className="btn btn-secondary m-5" onClick={addTreasure}>
+            Add Treasure
+          </button>
+
           {/* UnlockChest */}
           <button className="btn btn-secondary m-5" onClick={unlockChest}>
             Unlock Chest
@@ -219,10 +219,7 @@ const Morbid = (props: {
           <div>{`Chest: ${chest.txHash}`}</div>
         </>
       ) : (
-        <div>
-          I'm sorry, my memory is bad. I don't remember having any chest
-          currently...
-        </div>
+        <div>I don't remember having any chest currently...</div>
       )}
     </div>
   );
