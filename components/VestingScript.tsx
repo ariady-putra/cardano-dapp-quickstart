@@ -1,4 +1,4 @@
-import { Constr, Data, Lucid, SpendingValidator } from "lucid-cardano";
+import { Constr, Data, Lucid, SpendingValidator, UTxO } from "lucid-cardano";
 import { useEffect, useState } from "react";
 import { getDatumFields } from "../utils/blockfrost";
 
@@ -78,36 +78,50 @@ const VestingScript = (props: {
         const beneficiary =
           lucid.utils.getAddressDetails(userAddress).paymentCredential?.hash;
 
-        const utxos = (await lucid.utxosAt(vestingAddress))?.filter(
-          async (utxo) => {
-            if (!utxo.datumHash) return false;
-
-            const datumFields = await getDatumFields(utxo.datumHash);
-
-            const lockUntil = datumFields[0];
-            // console.log({ lockUntil: lockUntil });
-            const lockUntilValue = lockUntil["int"];
-            // console.log({ lockUntilValue: lockUntilValue });
-
-            const owner = datumFields[1];
-            // console.log({ owner: owner });
-            const ownerValue = owner["bytes"];
-            // console.log({ ownerValue: ownerValue });
-
-            const beneficiary = datumFields[2];
-            // console.log({ beneficiary: beneficiary });
-            const beneficiaryValue = beneficiary["bytes"];
-            // console.log({ beneficiaryValue: beneficiaryValue });
-
-            const is_owner = () => ownerValue === pkh;
-            const is_beneficiary_after_deadline = () =>
-              beneficiaryValue === beneficiary &&
-              new Date().getTime() >= lockUntilValue;
-            return is_owner() || is_beneficiary_after_deadline();
-          }
-        );
+        const utxos = await lucid.utxosAt(vestingAddress);
         console.log({ utxos: utxos });
         if (!utxos?.length) {
+          throw { emptyScriptAddress: "No UTxO to redeem." };
+        }
+
+        const collectUTxOs: UTxO[] = [];
+
+        const forEachAsync = async (
+          utxos: UTxO[],
+          callback: { (utxo: UTxO): Promise<void>; (arg0: any): any }
+        ) => {
+          for (const utxo of utxos) {
+            await callback(utxo);
+          }
+        };
+
+        const myAsyncCallback = async (utxo: UTxO) => {
+          if (!utxo.datumHash) return;
+
+          const datumFields = await getDatumFields(utxo.datumHash);
+
+          const datumLockUntil = datumFields[0];
+          const datumLockUntilValue = datumLockUntil["int"];
+
+          const datumOwner = datumFields[1];
+          const datumOwnerValue = datumOwner["bytes"];
+
+          const datumBeneficiary = datumFields[2];
+          const datumBeneficiaryValue = datumBeneficiary["bytes"];
+
+          const is_owner = () => datumOwnerValue === pkh;
+          const is_beneficiary_after_deadline = () =>
+            datumBeneficiaryValue === beneficiary &&
+            new Date().getTime() >= datumLockUntilValue;
+          if (is_owner() || is_beneficiary_after_deadline()) {
+            collectUTxOs.push(utxo);
+          }
+        };
+
+        await forEachAsync(utxos, myAsyncCallback);
+
+        console.log({ collectUTxOs: collectUTxOs });
+        if (!collectUTxOs.length) {
           throw { nothingToUnlock: "No valid UTxO to redeem." };
         }
 
@@ -116,9 +130,9 @@ const VestingScript = (props: {
 
         const tx = await lucid
           .newTx()
-          .collectFrom(utxos, empty)
+          .collectFrom(collectUTxOs, empty)
           .addSigner(userAddress)
-          .readFrom([utxos[0]]) // reference script
+          .readFrom([collectUTxOs[0]]) // reference script
           .validFrom(new Date().getTime())
           .complete();
 
