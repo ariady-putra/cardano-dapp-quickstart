@@ -14,6 +14,7 @@ import WalletConnect from "../components/WalletConnect";
 import LockUnlock from "../components/LockUnlock";
 import VestingScript from "../components/VestingScript";
 import Morbid from "../components/Morbid";
+import GiftCard from "../components/GiftCard";
 
 const Helios: NextPage = () => {
   const MorbidProvider = StoreProvider as any;
@@ -65,6 +66,8 @@ const Helios: NextPage = () => {
       <MorbidProvider store={chestStore}>
         <Morbid lucid={lucid} setActionResult={setActionResult} />
       </MorbidProvider>
+
+      <GiftCard lucid={lucid} setActionResult={setActionResult} />
 
       <div className="px-10 text-xl">
         <pre>{actionResult}</pre>
